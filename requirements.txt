@@ -1,4 +1,15 @@
-langchain>=0.1.0
+langchain==1.0.5
+langchain_core==1.0.4
+langchain_community>=0.1.0
+langchain_text_splitters>=0.1.0
+langchain_huggingface>=0.1.0
+langchain_ollama>=0.1.0
+langchain_openai>=0.1.0
+llama_index>=0.5.0
+llama-index-core>=0.5.0
+llama-index-embeddings-openai
+llama-index-embeddings-huggingface
+llama-index-embeddings-ollama
 langgraph-sdk>=0.2.0
 openai>=1.0.0
 pandas>=2.0.0
@@ -16,3 +27,8 @@ plotly>=5.15.0
 seaborn>=0.12.0
 ollama>=0.1.0
 vllm>=0.3.3
+requests
+ta
+nest_asyncio
+dashscope
+akshare

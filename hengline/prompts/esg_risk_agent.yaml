@@ -1,0 +1,41 @@
+analysis: |-
+  请对股票代码 {{stock_code}} 进行全面的ESG与治理风险分析。
+
+  股票基本信息：
+  {{stock_info}}
+
+  ESG数据：
+  {{esg_data}}
+
+  公司治理数据：
+  {{governance_data}}
+
+  争议事件：
+  {{controversies}}
+
+  风险评估：
+  {{risk_assessment}}
+
+  请按照以下维度进行分析：
+  1. 环境(Environmental)维度：评估公司的环保表现、资源使用效率、碳排放管理等
+  2. 社会(Social)维度：分析公司的劳动关系、社区参与、产品安全、供应链管理等
+  3. 治理(Governance)维度：评价公司的董事会结构、高管薪酬、股东权利、透明度等
+  4. 争议事件影响：分析已发生的ESG相关争议事件及其对公司的潜在影响
+  5. 风险评估：综合评估ESG风险的严重程度和可能的财务影响
+  6. 可持续发展机遇：识别ESG领域的改进机会和长期价值创造潜力
+
+  请提供：
+  - 3-5个关键ESG发现
+  - 详细的ESG与治理风险分析报告
+  - ESG风险对投资决策的潜在影响
+  - 需要关注的ESG风险信号
+  - 可持续发展改进建议
+
+  请以JSON格式输出，包含以下字段：
+  - key_findings: 关键发现列表
+  - detailed_analysis: 按上述维度组织的详细分析
+  - esg_summary: ESG表现摘要
+  - investment_impact: 对投资决策的影响
+  - risk_signals: 风险信号列表
+  - improvement_recommendations: 改进建议
+  - confidence_score: 分析置信度（0-1）

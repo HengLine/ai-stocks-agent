@@ -1,0 +1,71 @@
+{
+  "AAPL": [
+    {
+      "title": "Apple Announces New iPhone 16 Features Coming This Fall",
+      "publisher": "TechNews Daily",
+      "link": "https://example.com/apple-iphone-16-news",
+      "providerPublishTime": 1730400000,
+      "summary": "Apple today revealed exciting new features for the upcoming iPhone 16 lineup, including improved camera systems and the new A18 chipset."
+    },
+    {
+      "title": "Apple's Services Revenue Continues to Grow at Impressive Rate",
+      "publisher": "Financial Times",
+      "link": "https://example.com/apple-services-revenue",
+      "providerPublishTime": 1730313600,
+      "summary": "Latest financial reports show Apple's services segment reaching record highs, with revenue increasing 12% year-over-year."
+    },
+    {
+      "title": "Analysts Raise Price Targets on Apple Stock Following Strong Guidance",
+      "publisher": "CNBC",
+      "link": "https://example.com/apple-analyst-upgrades",
+      "providerPublishTime": 1730227200,
+      "summary": "Multiple Wall Street analysts have raised their price targets for AAPL following the company's stronger-than-expected quarterly guidance."
+    }
+  ],
+  "MSFT": [
+    {
+      "title": "Microsoft Announces Major AI Integration Across Product Line",
+      "publisher": "AI Trends",
+      "link": "https://example.com/microsoft-ai-integration",
+      "providerPublishTime": 1730400000,
+      "summary": "Microsoft today announced comprehensive AI integration plans for Office, Windows, and Azure services, aiming to maintain leadership in enterprise AI."
+    },
+    {
+      "title": "Microsoft Cloud Revenue Surges 35% in Latest Quarter",
+      "publisher": "Bloomberg",
+      "link": "https://example.com/microsoft-cloud-growth",
+      "providerPublishTime": 1730313600,
+      "summary": "Azure and other cloud services continue to drive Microsoft's growth, with revenue from the segment growing at its fastest pace in over a year."
+    },
+    {
+      "title": "Microsoft Expands Partnership with OpenAI to Extend AI Capabilities",
+      "publisher": "TechCrunch",
+      "link": "https://example.com/microsoft-openai-partnership",
+      "providerPublishTime": 1730227200,
+      "summary": "A new multi-year agreement between Microsoft and OpenAI will see deeper integration of AI models across Microsoft's product ecosystem."
+    }
+  ],
+  "GOOGL": [
+    {
+      "title": "Alphabet Launches New AI-Powered Search Features",
+      "publisher": "Search Engine Journal",
+      "link": "https://example.com/google-ai-search",
+      "providerPublishTime": 1730400000,
+      "summary": "Google has unveiled revolutionary new AI search capabilities that will transform how users interact with the search engine."
+    },
+    {
+      "title": "YouTube Ad Revenue Exceeds Expectations in Q4",
+      "publisher": "Advertising Age",
+      "link": "https://example.com/youtube-ad-revenue",
+      "providerPublishTime": 1730313600,
+      "summary": "Alphabet's YouTube division reported stronger-than-expected ad revenue growth, driven by increasing viewership and engagement."
+    },
+    {
+      "title": "Alphabet Announces Cost-Cutting Measures to Focus on AI Investments",
+      "publisher": "Reuters",
+      "link": "https://example.com/alphabet-restructuring",
+      "providerPublishTime": 1730227200,
+      "summary": "Alphabet is implementing a series of organizational changes to streamline operations and redirect resources toward AI development initiatives."
+    }
+  ]
+}

@@ -16,9 +16,9 @@ if %ERRORLEVEL% neq 0 (
 echo 正在使用Python: %PYTHON_VERSION%
 
 REM 创建虚拟环境
-if not exist venv (
+if not exist .venv (
     echo 创建Python虚拟环境...
-    python -m venv venv
+    python -m venv .venv
     if %ERRORLEVEL% neq 0 (
         echo 错误: 无法创建虚拟环境。
         pause
@@ -27,7 +27,7 @@ if not exist venv (
 )
 
 REM 激活虚拟环境
-call venv\Scripts\activate
+call .venv\Scripts\activate
 if %ERRORLEVEL% neq 0 (
     echo 错误: 无法激活虚拟环境。
     pause
@@ -64,11 +64,11 @@ echo AI Stocks Agent 安装已完成！
 echo ================================
 echo 要使用项目，请运行:
 if %0 == "%~f0" (
-    echo   venv\Scripts\activate
-    echo   python main.py
-) else (
-    echo   python main.py
+    echo   .venv\Scripts\activate.bat
 )
+
+echo  python main.py  --dashboard
+
 echo.
 echo 或者直接运行 start.bat 启动交互式界面
 echo ================================

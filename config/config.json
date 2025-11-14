@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "AI Stocks Agent",
+    "version": "1.0.0",
+    "debug": false
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "workers": 1
+  },
+  "llm": {
+    "provider": "openai",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "",
+    "model_name": "gpt-4o",
+    "timeout": 60,
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "retry_count": 3
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  },
+  "embedding": {
+    "provider": "openai",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "",
+    "model_name": "text-embedding-3-small",
+    "memory_top_k": 5,
+    "enable_memory": true,
+    "timeout": 60,
+    "retry_count": 3
+  },
+  "paths": {
+    "data_output": "data/output",
+    "embedding_cache": "data/embeddings",
+    "visualizations": "data/visualizations"
+  },
+  "api_keys": {
+    "alpha_vantage": "${ALPHA_VANTAGE_API_KEY}",
+    "iex_cloud": "${IEX_CLOUD_API_KEY}",
+    "yfinance": "${YFINANCE_API_KEY}",
+    "alltick": "${ALLTICK_API_KEY}"
+  }
+}

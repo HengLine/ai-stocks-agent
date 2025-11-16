@@ -26,9 +26,9 @@ class YahooDirectSource:
         """
         self.base_url = "https://query1.finance.yahoo.com"
         # 从配置中获取API密钥，使用yfinance作为键名以保持一致性
-        self.api_key = api_keys.get("yfinance")
-        if not self.api_key:
-            warning("未设置 Yahoo API 密钥，请在环境变量中设置 YFINANCE_API_KEY 或 YAHOO_API_KEY")
+        # self.api_key = api_keys.get("yfinance")
+        # if not self.api_key:
+        #     warning("未设置 Yahoo API 密钥，请在环境变量中设置 YFINANCE_API_KEY 或 YAHOO_API_KEY")
 
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'

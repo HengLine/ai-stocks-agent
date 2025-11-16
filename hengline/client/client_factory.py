@@ -15,18 +15,17 @@ from typing import Any, Dict, Optional
 
 from openai import OpenAI
 
-from config.config import get_ai_config
 from hengline.client.deepseek_client import DeepSeekClient
 from hengline.client.ollama_client import OllamaClient
 # 导入各个厂商的客户端实现
 from hengline.client.openai_client import OpenAIClient
 from hengline.client.qwen_client import QwenClient
 from hengline.logger import error, debug, warning
+from config.config import get_ai_config
 
 
 class ClientFactory:
     """AI客户端工厂类，负责统一调用不同厂商的客户端实现"""
-
     # 支持的提供商列表
     SUPPORTED_PROVIDERS = ['openai', 'qwen', 'deepseek', 'ollama']
 
@@ -63,7 +62,7 @@ class ClientFactory:
             return DeepSeekClient.create_client(config)
         elif provider == 'ollama':
             return OllamaClient.create_client(config)
-            
+
     @classmethod
     def get_langchain_llm(cls, provider: str = None, config: Optional[Dict[str, Any]] = None) -> Optional[Any]:
         """
@@ -77,18 +76,18 @@ class ClientFactory:
             LangChain兼容的LLM实例，如果不支持则返回None
         """
         config = config or {}
-        
+
         # 如果没有指定提供商，尝试从配置中获取
         if not provider:
             provider = config.get('model_type', 'openai')
         # 确保提供商名称小写
         provider = provider.lower()
-        
+
         # 检查提供商是否支持
         if provider not in cls.SUPPORTED_PROVIDERS:
             warning(f"不支持的AI提供商: {provider}")
             return None
-        
+
         # 获取对应的客户端类
         try:
             client_class = cls.get_provider_client_class(provider)
@@ -98,7 +97,7 @@ class ClientFactory:
         except Exception as e:
             print_log_exception()
             error(f"获取 {provider} 的LangChain LLM实例失败: {str(e)}")
-        
+
         return None
 
     @staticmethod
@@ -154,13 +153,31 @@ def get_ai_client(provider: Optional[str] = None, config: Optional[Dict[str, Any
         配置好的AI客户端实例
     """
     # 如果未指定提供商，从配置中获取默认值
+    if config is None:
+        config = get_ai_config()
     if provider is None:
-        provider = get_ai_config().get('provider', 'openai')
-    # 确保提供商名称小写
-    provider = provider.lower()
-
+        provider = config.get('provider', 'openai')
     # 使用工厂创建客户端
-    return ai_client_factory.create_client(provider, config)
+    return ai_client_factory.create_client(provider.lower(), config)
+
+
+def get_langchain_llm(provider: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Optional[Any]:
+    """
+    获取LangChain兼容的LLM实例的便捷函数
+    
+    Args:
+        provider: AI模型提供商名称，如果为None则使用配置中的默认值
+        config: 客户端配置参数
+        
+    Returns:
+        LangChain兼容的LLM实例，如果不支持则返回None
+    """
+    if config is None:
+        config = get_ai_config()
+    if provider is None:
+        provider = config.get('provider', 'openai')
+    # 确保提供商名称小写
+    return ai_client_factory.get_langchain_llm(provider.lower(), config)
 
 
 def convert_response(provider: str, response: Any) -> str:
@@ -181,7 +198,7 @@ def convert_response(provider: str, response: Any) -> str:
         if response is None:
             debug(f"收到空响应，提供商: {provider}")
             return ''
-        
+
         # 对于特定提供商，使用其专用的转换方法
         if provider in ['qwen', 'deepseek', 'ollama']:
             try:
@@ -194,7 +211,7 @@ def convert_response(provider: str, response: Any) -> str:
             except Exception as e:
                 error(f"调用{provider}的转换方法失败: {str(e)}")
                 # 继续尝试通用转换方法
-        
+
         # OpenAI和通用响应格式处理
         # 1. 处理对象类型响应
         if hasattr(response, 'choices') and response.choices:
@@ -205,7 +222,7 @@ def convert_response(provider: str, response: Any) -> str:
                     return message.content
                 elif hasattr(message, 'text'):
                     return message.text
-        
+
         # 2. 处理字典类型响应
         elif isinstance(response, dict):
             # 标准OpenAI格式
@@ -218,12 +235,12 @@ def convert_response(provider: str, response: Any) -> str:
                         return message.get('content', '') or message.get('text', '')
                     elif hasattr(message, 'content'):
                         return message.content
-            
+
             # 其他常见格式
             # 直接输出格式
             if 'content' in response:
                 return response['content']
-            
+
             # 输出对象格式
             output = response.get('output')
             if output:
@@ -233,24 +250,24 @@ def convert_response(provider: str, response: Any) -> str:
                     return output.text
                 elif hasattr(output, 'content'):
                     return output.content
-        
+
         # 3. 直接文本响应
         elif isinstance(response, str):
             return response
-        
+
         # 4. 处理其他可能的格式
         # 检查是否有直接的文本属性
         if hasattr(response, 'text'):
             return response.text
         elif hasattr(response, 'content'):
             return response.content
-        
+
         # 未知格式，记录详细信息以便调试
         error(f"无法识别的响应格式，提供商: {provider}, 类型: {type(response).__name__}, 内容: {str(response)[:200]}...")
-        
+
         # 最后的备选方案：返回响应的字符串表示
         return str(response) if response else ''
-        
+
     except Exception as e:
         error(f"转换响应时发生异常，提供商: {provider}, 错误: {str(e)}")
         # 安全地返回响应的字符串表示

@@ -5,8 +5,6 @@
 提供统一的多源股票数据获取接口
 """
 
-import json
-import os
 import random
 import time
 from typing import Dict, Any, List
@@ -14,16 +12,17 @@ from typing import Dict, Any, List
 import pandas as pd
 
 # 导入配置系统
-from config.config import get_api_keys_config, get_api_key
+from config.config import get_api_keys_config
 from hengline.logger import debug, info, error, warning
-# 导入各个数据源类
-from hengline.stock.sources.yfinance_source import YFinanceSource
-from hengline.stock.sources.yahoo_direct_source import YahooDirectSource
-from hengline.stock.sources.alpha_vantage_source import AlphaVantageSource
-from hengline.stock.sources.iex_cloud_source import IEXCloudSource
+from hengline.stock.simulated.stock_data_manager import stock_data_manager
 from hengline.stock.sources.akshare_source import AKShareSource
 from hengline.stock.sources.alltick_source import AlltickSource
-from hengline.stock.simulated.stock_data_manager import stock_data_manager
+from hengline.stock.sources.alpha_vantage_source import AlphaVantageSource
+from hengline.stock.sources.iex_cloud_source import IEXCloudSource
+from hengline.stock.sources.yahoo_direct_source import YahooDirectSource
+# 导入各个数据源类
+from hengline.stock.sources.yfinance_source import YFinanceSource
+
 
 class StockDataManager:
     """
@@ -36,7 +35,7 @@ class StockDataManager:
         从配置系统获取API密钥
         """
         # 从配置获取API密钥
-        self.api_keys : Dict[str, Any] = get_api_keys_config()
+        self.api_keys: Dict[str, Any] = get_api_keys_config()
         self._data_sources = {}
         self._last_request_time = {}
         self._consecutive_failures = {}
@@ -45,24 +44,29 @@ class StockDataManager:
     def _init_data_sources(self):
         """
         初始化所有可用的数据源
+        只有在提供了有效API密钥或不需要密钥时才初始化相应数据源
         """
         info("初始化股票数据源...")
 
         # 初始化各个数据源
         try:
-            # 初始化AKShare数据源
+            # AKShare不需要API密钥，直接初始化
             self._data_sources['akshare'] = AKShareSource()
             debug("成功初始化 AKShare 数据源")
         except Exception as e:
             error(f"初始化 akshare 数据源失败: {str(e)}")
 
         try:
-            # 初始化Alltick数据源
-            self._data_sources['alltick'] = AlltickSource(self.api_keys)
-            info("成功初始化 alltick 数据源")
+            # 检查Alltick API密钥
+            alltick_key = self.api_keys.get("alltick", "")
+            if alltick_key and alltick_key.strip() and not alltick_key.startswith('$'):
+                self._data_sources['alltick'] = AlltickSource(self.api_keys)
+                info("成功初始化 alltick 数据源")
+            else:
+                info("未提供有效的Alltick API密钥，跳过初始化")
         except Exception as e:
             error(f"初始化 alltick 数据源失败: {str(e)}")
-            
+
         try:
             # yfinance不需要API密钥，直接初始化
             self._data_sources['yfinance'] = YFinanceSource(self.api_keys)
@@ -77,26 +81,24 @@ class StockDataManager:
             error(f"初始化 yahoo_direct 数据源失败: {str(e)}")
 
         try:
-            # AlphaVantageSource现在会从环境变量自动获取API密钥
-            self._data_sources['alpha_vantage'] = AlphaVantageSource(self.api_keys)
-            info("成功初始化 alpha_vantage 数据源")
+            # 检查Alpha Vantage API密钥
+            alpha_vantage_key = self.api_keys.get("alpha_vantage", "")
+            if alpha_vantage_key and alpha_vantage_key.strip() and not alpha_vantage_key.startswith('$'):
+                self._data_sources['alpha_vantage'] = AlphaVantageSource(alpha_vantage_key)
+                info("成功初始化 alpha_vantage 数据源")
+            else:
+                info("未提供有效的Alpha Vantage API密钥，跳过初始化")
         except Exception as e:
             error(f"初始化 alpha_vantage 数据源失败: {str(e)}")
 
         try:
-            # 直接初始化IEX Cloud数据源，它会从环境变量获取API密钥
-            try:
-                self._data_sources['iex_cloud'] = IEXCloudSource(self.api_keys)
+            # 检查IEX Cloud API密钥
+            iex_cloud_key = self.api_keys.get("iex_cloud", "")
+            if iex_cloud_key and iex_cloud_key.strip() and not iex_cloud_key.startswith('$'):
+                self._data_sources['iex_cloud'] = IEXCloudSource({"iex_cloud": iex_cloud_key})
                 info("成功初始化 iex_cloud 数据源")
-            except Exception as inner_e:
-                warning(f"IEX Cloud初始化时出现问题: {str(inner_e)}")
-                # 如果直接初始化失败，尝试使用get_api_key获取并传递
-                iex_cloud_key = get_api_key("iex_cloud")
-                if iex_cloud_key and not iex_cloud_key.startswith('$'):  # 确保不是未替换的环境变量模板
-                    self._data_sources['iex_cloud'] = IEXCloudSource({"iex_cloud": iex_cloud_key})
-                    info("成功使用API密钥初始化 iex_cloud 数据源")
-                else:
-                    warning("未提供有效的IEX Cloud API密钥，跳过初始化")
+            else:
+                info("未提供有效的IEX Cloud API密钥，跳过初始化")
         except Exception as e:
             error(f"初始化 iex_cloud 数据源失败: {str(e)}")
 
@@ -262,42 +264,40 @@ class StockDataManager:
             模拟数据，确保返回有效的数据结构
         """
         import pandas as pd
-        import numpy as np
-        from datetime import datetime, timedelta
-        
+
         try:
             stock_code = args[0] if args else 'Unknown'
             debug(f"尝试为 {stock_code} 生成模拟数据: {method_name}")
-            
+
             if method_name == 'get_stock_price_data':
                 # 从模拟数据管理器获取股票价格数据
                 stock_code = args[0] if args else ''
                 period = kwargs.get('period', '1mo')
                 interval = kwargs.get('interval', '1d')
                 return stock_data_manager.get_stock_price_data(stock_code, period, interval)
-                
+
             elif method_name == 'get_stock_info':
                 # 从模拟数据管理器获取股票基本信息
                 stock_code = args[0] if args else ''
                 return stock_data_manager.get_stock_info(stock_code)
-                
+
             elif method_name == 'get_stock_news':
                 # 从模拟数据管理器获取股票新闻
                 stock_code = args[0] if args else ''
                 return stock_data_manager.get_stock_news(stock_code)
-                
+
             elif method_name == 'get_financial_data':
                 # 从模拟数据管理器获取财务数据
                 stock_code = args[0] if args else ''
                 return stock_data_manager.get_financial_data(stock_code)
-                
+
             elif method_name == 'get_stock_realtime_data':
                 # 从模拟数据管理器获取实时数据
                 stock_code = args[0] if args else ''
                 return stock_data_manager.get_stock_realtime_data(stock_code)
-                
+
             return None
-            
+
         except Exception as e:
             error(f"生成模拟数据时出错: {e}")
             # 即使生成模拟数据失败，也返回对应的空数据结构
@@ -324,26 +324,26 @@ class StockDataManager:
             获取的数据，如果在线数据源失败则立即返回模拟数据
         """
         import time
-        
+
         # 生成缓存键
         cache_key = f"{method_name}:{':'.join(str(arg) for arg in args)}:{':'.join(f'{k}={v}' for k, v in sorted(kwargs.items()))}"
-        
+
         # 检查缓存
         if hasattr(self, '_cache') and cache_key in self._cache:
             cached_data, timestamp = self._cache[cache_key]
             if time.time() - timestamp < getattr(self, '_cache_ttl', 300):  # 默认缓存5分钟
                 debug(f"从缓存获取数据: {cache_key}")
                 return cached_data
-        
+
         stock_code = args[0] if args else ''
-        
+
         # 判断是否为A股代码（简单判断：6位数字或带sh/sz前缀）
         is_a_stock = False
         stock_code_lower = stock_code.lower()
-        if (stock_code_lower.startswith('sh') or stock_code_lower.startswith('sz') or 
-            (stock_code.isdigit() and len(stock_code) == 6)):
+        if (stock_code_lower.startswith('sh') or stock_code_lower.startswith('sz') or
+                (stock_code.isdigit() and len(stock_code) == 6)):
             is_a_stock = True
-        
+
         # 根据股票类型设置数据源优先级
         if is_a_stock:
             # A股优先使用AKShare数据源，Alltick作为备选
@@ -356,7 +356,7 @@ class StockDataManager:
         # 过滤掉冷却中的数据源
         current_time = time.time()
         available_sources = []
-        
+
         if hasattr(self, '_failed_sources'):
             for source_name in source_priority:
                 if source_name in self._failed_sources:
@@ -372,12 +372,12 @@ class StockDataManager:
             available_sources = source_priority
             # 初始化失败数据源跟踪字典
             self._failed_sources = {}
-        
+
         # 确保缓存机制已初始化
         if not hasattr(self, '_cache'):
             self._cache = {}
             self._cache_ttl = 300  # 缓存有效期5分钟
-        
+
         # 快速检查：如果已经有多个数据源失败记录或可用数据源较少，直接返回模拟数据
         if hasattr(self, '_failed_sources') and len(self._failed_sources) >= 2:
             info("检测到多个数据源失败，立即返回模拟数据以避免阻塞")
@@ -386,7 +386,7 @@ class StockDataManager:
                 # 缓存模拟数据
                 self._cache[cache_key] = (mock_result, time.time())
                 return mock_result
-        
+
         if not available_sources:
             warning("所有数据源都在冷却中，立即返回模拟数据")
             # 如果所有数据源都在冷却中，直接返回模拟数据
@@ -395,16 +395,16 @@ class StockDataManager:
                 # 缓存模拟数据
                 self._cache[cache_key] = (mock_result, time.time())
                 return mock_result
-        
+
         # 限制尝试的数据源数量，避免长时间阻塞
         max_attempts = 2  # 最多尝试2个数据源
         attempts = 0
-        
+
         # 遍历数据源尝试获取数据
         for source_name in available_sources:
             if source_name not in self._data_sources:
                 continue
-                
+
             attempts += 1
             # 尝试第一个数据源，如果失败且已达到最大尝试次数，则直接返回模拟数据
             result = self._try_data_source(source_name, method_name, *args, **kwargs)
@@ -420,13 +420,13 @@ class StockDataManager:
                 # 失败次数越多，冷却时间越长（指数退避）
                 _, prev_cool_down = self._failed_sources[source_name]
                 cool_down_time = min(prev_cool_down * 2, 300)  # 最多冷却5分钟
-            
+
             if hasattr(self, '_failed_sources'):
                 self._failed_sources[source_name] = (current_time, cool_down_time)
                 warning(f"从 {source_name} 获取数据失败，进入 {cool_down_time:.1f} 秒冷却期")
             else:
                 warning(f"从 {source_name} 获取数据失败")
-                
+
             # 如果已经尝试了最大次数，直接返回模拟数据
             if attempts >= max_attempts:
                 info(f"已尝试 {attempts} 个数据源，全部失败，立即返回模拟数据")
@@ -510,12 +510,12 @@ class StockDataManager:
             财务数据字典，确保只包含有效的DataFrame
         """
         financial_data = self._get_data_with_fallback('get_financial_data', stock_code)
-        
+
         # 确保返回的是有效的字典，且只包含有效的DataFrame
         if not isinstance(financial_data, dict):
             debug(f"财务数据不是字典类型: {type(financial_data)}")
             return {}
-        
+
         # 清理财务数据，确保每个值都是有效的DataFrame
         valid_financial_data = {}
         for key, df in financial_data.items():
@@ -523,7 +523,7 @@ class StockDataManager:
                 valid_financial_data[key] = df
             else:
                 debug(f"跳过无效的财务数据项: {key} = {type(df)}")
-        
+
         return valid_financial_data
 
     def get_stock_realtime_data(self, stock_code: str) -> Dict[str, Any]:

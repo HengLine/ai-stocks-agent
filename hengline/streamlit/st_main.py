@@ -17,6 +17,12 @@ from utils.date_utils import format_date, format_date_for_filename
 # 导入真实的股票数据管理器
 from hengline.stock.stock_manage import get_stock_price_data, get_stock_info, get_stock_news, get_financial_data
 
+# 导入智能体协调器
+from hengline.agents.agent_coordinator import AgentCoordinator
+
+# 导入问答模块
+from hengline.streamlit.st_qa import show_qa_view
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -165,6 +171,193 @@ class StockDataViews:
                 st.write(item['summary'])
 
     @staticmethod
+    def show_agent_analysis_view(ticker, price_data):
+        """显示智能体分析视图"""
+        st.markdown("### AI智能体综合分析")
+        # 添加使用说明
+        st.markdown("""
+        本系统集成了多个专业AI智能体，为您提供全方位的股票分析：
+        
+        - **基本面分析**: 深度分析公司财务状况、盈利能力和估值水平
+        - **技术面分析**: 专业分析价格走势、技术指标和交易信号
+        - **行业宏观分析**: 评估行业发展趋势和宏观经济影响
+        - **舆情情绪分析**: 分析市场情绪和新闻舆情对股价的影响
+        - **资金流分析**: 监控机构资金流向和持仓变化
+        - **ESG风险分析**: 评估环境、社会和治理风险
+        - **首席策略官**: 整合所有分析结果，提供最终投资建议
+        
+        点击"开始分析"按钮即可启动智能体综合分析。
+        """)
+        
+        # 初始化智能体协调器
+        try:
+            with st.spinner("正在初始化智能体分析系统..."):
+                coordinator = AgentCoordinator()
+                st.success("智能体系统初始化成功")
+        except Exception as e:
+            st.error(f"智能体系统初始化失败: {str(e)}")
+            return
+        
+        # 分析按钮
+        if st.button(f"开始分析 {ticker}", type="primary"):
+            with st.spinner("智能体正在进行综合分析，请稍候..."):
+                try:
+                    # 执行智能体分析
+                    analysis_result = coordinator.analyze(
+                        stock_code=ticker,
+                        time_range="1y"
+                    )
+                    
+                    if analysis_result.get("success", False):
+                        st.success("智能体分析完成！")
+                        
+                        # 显示最终建议
+                        if "final_result" in analysis_result and analysis_result["final_result"]:
+                            final_result = analysis_result["final_result"]
+                            if hasattr(final_result, 'result') and final_result.result:
+                                st.markdown("#### 最终投资建议")
+                                
+                                result_data = final_result.result
+                                
+                                # 投资建议
+                                if "investment_recommendation" in result_data:
+                                    st.markdown(f"**建议:** {result_data['investment_recommendation']}")
+                                
+                                # 综合评分
+                                if "overall_score" in result_data:
+                                    score = result_data['overall_score']
+                                    st.metric("综合评分", f"{score}/10")
+                                
+                                # 风险等级
+                                if "risk_level" in result_data:
+                                    risk_level = result_data['risk_level']
+                                    if risk_level.lower() in ["低", "low"]:
+                                        st.success(f"风险等级: {risk_level}")
+                                    elif risk_level.lower() in ["中", "medium"]:
+                                        st.warning(f"风险等级: {risk_level}")
+                                    else:
+                                        st.error(f"风险等级: {risk_level}")
+                        
+                        # 显示各智能体详细分析
+                        st.markdown("#### 各专业智能体分析结果")
+                        
+                        if "detailed_results" in analysis_result:
+                            detailed_results = analysis_result["detailed_results"]
+                            
+                            # 基本面分析
+                            if "FundamentalAgent" in detailed_results:
+                                with st.expander("基本面分析"):
+                                    result = detailed_results["FundamentalAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                                    
+                                    if "detailed_analysis" in result:
+                                        st.markdown("**详细分析:**")
+                                        st.write(result["detailed_analysis"])
+                                    
+                                    if "overall_score" in result:
+                                        st.metric("基本面评分", f"{result['overall_score']}/10")
+                            
+                            # 技术面分析
+                            if "TechnicalAgent" in detailed_results:
+                                with st.expander("技术面分析"):
+                                    result = detailed_results["TechnicalAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                                    
+                                    if "signal_strength" in result:
+                                        st.metric("信号强度", result["signal_strength"])
+                                    
+                                    if "short_term_outlook" in result:
+                                        st.markdown("**短期展望:**")
+                                        st.write(result["short_term_outlook"])
+                            
+                            # 行业宏观分析
+                            if "IndustryMacroAgent" in detailed_results:
+                                with st.expander("行业宏观分析"):
+                                    result = detailed_results["IndustryMacroAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                                    
+                                    if "industry_trend" in result:
+                                        st.markdown("**行业趋势:**")
+                                        st.write(result["industry_trend"])
+                            
+                            # 舆情情绪分析
+                            if "SentimentAgent" in detailed_results:
+                                with st.expander("舆情情绪分析"):
+                                    result = detailed_results["SentimentAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                                    
+                                    if "sentiment_score" in result:
+                                        st.metric("情绪评分", f"{result['sentiment_score']}/10")
+                            
+                            # 资金流分析
+                            if "FundFlowAgent" in detailed_results:
+                                with st.expander("资金流分析"):
+                                    result = detailed_results["FundFlowAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                            
+                            # ESG风险分析
+                            if "ESGRiskAgent" in detailed_results:
+                                with st.expander("ESG风险分析"):
+                                    result = detailed_results["ESGRiskAgent"]
+                                    if "key_findings" in result:
+                                        st.markdown("**关键发现:**")
+                                        for finding in result["key_findings"]:
+                                            st.write(f"• {finding}")
+                                    
+                                    if "esg_score" in result:
+                                        st.metric("ESG评分", f"{result['esg_score']}/10")
+                        
+                        # 显示执行状态
+                        if "agent_execution_status" in analysis_result:
+                            st.markdown("#### 智能体执行状态")
+                            status_data = analysis_result["agent_execution_status"]
+                            
+                            for agent_name, status in status_data.items():
+                                agent_display_name = {
+                                    "FundamentalAgent": "基本面分析",
+                                    "TechnicalAgent": "技术面分析", 
+                                    "IndustryMacroAgent": "行业宏观分析",
+                                    "SentimentAgent": "舆情情绪分析",
+                                    "FundFlowAgent": "资金流分析",
+                                    "ESGRiskAgent": "ESG风险分析",
+                                    "ChiefStrategyAgent": "首席策略官"
+                                }.get(agent_name, agent_name)
+                                
+                                if status["success"]:
+                                    st.success(f"{agent_display_name}: 成功 (置信度: {status['confidence_score']:.2f})")
+                                else:
+                                    st.error(f"{agent_display_name}: 失败 - {status.get('error', '未知错误')}")
+                        
+                        # 显示分析耗时
+                        if "elapsed_time_seconds" in analysis_result:
+                            elapsed_time = analysis_result["elapsed_time_seconds"]
+                            st.info(f"分析耗时: {elapsed_time:.2f} 秒")
+                    
+                    else:
+                        st.error("智能体分析失败")
+                        if "error" in analysis_result:
+                            st.error(f"错误信息: {analysis_result['error']}")
+                
+                except Exception as e:
+                    st.error(f"分析过程中发生错误: {str(e)}")
+                    st.info("请检查网络连接和API配置是否正确")
+
+    @staticmethod
     def show_advanced_analysis_view(ticker, price_data):
         """显示高级分析视图"""
         st.markdown("### 高级技术分析")
@@ -252,11 +445,12 @@ with st.sidebar:
     st.markdown("## 视图设置")
     view_mode = st.selectbox(
         "选择视图模式",
-        ["股票概览", "价格图表", "财务分析", "高级分析"]
+        ["股票概览", "价格图表", "财务分析", "智能体分析", "高级分析", "智能问答"]
     )
 
 # 主内容区域
-st.markdown("# :blue[股票数据分析平台] :sunglasses:")
+# st.markdown("# :blue[股票数据分析平台] :sunglasses:")
+st.markdown("# :blue[股票数据分析平台]")
 # st.markdown("## 实时股票数据可视化与分析")
 
 # 显示加载状态
@@ -289,8 +483,14 @@ with st.spinner("正在获取数据..."):
             StockDataViews.show_overview_view(ticker, stock_info, price_data, news_data)
             st.info("最新新闻已整合到股票概览页面中")
 
+        elif view_mode == "智能体分析":
+            StockDataViews.show_agent_analysis_view(ticker, price_data)
+
         elif view_mode == "高级分析":
             StockDataViews.show_advanced_analysis_view(ticker, price_data)
+
+        elif view_mode == "智能问答":
+            show_qa_view()
 
         # 股票对比功能
         if comparison_enabled and compare_tickers:

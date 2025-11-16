@@ -35,9 +35,9 @@ class YFinanceSource:
         self.timeout = 30
 
         # 从配置中获取API密钥
-        self.api_key = api_keys.get("yfinance")
-        if not self.api_key:
-            warning("未设置 YFinance API 密钥，请在环境变量中设置 YFINANCE_API_KEY")
+        # self.api_key = api_keys.get("yfinance")
+        # if not self.api_key:
+        #     warning("未设置 YFinance API 密钥，请在环境变量中设置 YFINANCE_API_KEY")
 
     def get_stock_price_data(self, stock_code: str, period: str = "1d", interval: str = "1m") -> pd.DataFrame:
         """

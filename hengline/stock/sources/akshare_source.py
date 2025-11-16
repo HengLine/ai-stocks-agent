@@ -5,6 +5,7 @@
 @Time: 2025/11/13
 """
 import time
+import random
 from typing import Any, Optional
 import requests
 from requests.adapters import HTTPAdapter
@@ -78,7 +79,7 @@ class AKShareSource:
             self.retry_strategy = Retry(
                 total=self.max_retries_adapter,
                 status_forcelist=[429, 500, 502, 503, 504],
-                method_whitelist=["HEAD", "GET", "OPTIONS"],
+                allowed_methods=["HEAD", "GET", "OPTIONS"],
                 backoff_factor=self.retry_backoff_factor,
                 raise_on_status=False
             )
@@ -203,7 +204,7 @@ class AKShareSource:
 
     def _retry_api_call(self, func, *args, **kwargs):
         """
-        带重试机制的API调用
+        带重试机制的API调用 - 增强版
         
         Args:
             func: 要调用的函数
@@ -215,13 +216,38 @@ class AKShareSource:
         """
         func_name = getattr(func, '__name__', 'unknown_function')
         
+        # User-Agent轮换列表
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+        ]
+        
         for attempt in range(self.max_retries):
             try:
                 # 在每次重试前检查连接健康状态
                 if attempt > 0:
                     self._recreate_session_if_needed()
+                    # 随机更换User-Agent
+                    self.session.headers['User-Agent'] = random.choice(user_agents)
+                
+                # 添加随机延迟避免频率限制
+                if attempt > 0:
+                    # 随机延迟：基础延迟 + 随机因子
+                    base_delay = (2 ** attempt) * self.retry_backoff_factor
+                    random_delay = random.uniform(0.5, 2.0) * (attempt ** 0.5)
+                    total_delay = base_delay + random_delay
+                    
+                    info(f"第 {attempt + 1} 次重试，随机延迟 {total_delay:.2f} 秒...")
+                    time.sleep(total_delay)
                 
                 self._log_api_call(func_name, attempt + 1, self.max_retries, *args, **kwargs)
+                
+                # 频率控制
+                self._wait_for_rate_limit()
+                
                 result = func(*args, **kwargs)
                 
                 # 检查结果有效性
@@ -282,55 +308,74 @@ class AKShareSource:
                     warning(f"AKShare API返回None，尝试次数: {attempt + 1}")
                     
             except requests.exceptions.ConnectionError as e:
-                error(f"AKShare连接错误 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
+                error_msg = str(e)
+                if "RemoteDisconnected" in error_msg or "Connection aborted" in error_msg:
+                    error(f"AKShare远程连接中断 (尝试 {attempt + 1}/{self.max_retries}): {error_msg}")
+                else:
+                    error(f"AKShare连接错误 (尝试 {attempt + 1}/{self.max_retries}): {error_msg}")
+                
                 if attempt < self.max_retries - 1:
-                    # 对于连接中断，使用更长的等待时间
-                    wait_time = min(60, (2 ** attempt) * self.retry_backoff_factor * 2)  # 连接错误等待时间翻倍
-                    info(f"连接错误，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    # 对于连接中断，使用更长的等待时间和随机化
+                    base_wait = min(60, (2 ** attempt) * self.retry_backoff_factor * 3)
+                    random_wait = random.uniform(1, 5)
+                    total_wait = base_wait + random_wait
+                    info(f"连接错误，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except requests.exceptions.Timeout as e:
                 error(f"AKShare请求超时 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(45, (2 ** attempt) * self.retry_backoff_factor * 1.5)  # 超时错误等待时间增加50%
-                    info(f"请求超时，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(45, (2 ** attempt) * self.retry_backoff_factor * 2)
+                    random_wait = random.uniform(0.5, 3)
+                    total_wait = base_wait + random_wait
+                    info(f"请求超时，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except requests.exceptions.HTTPError as e:
                 error(f"AKShare HTTP错误 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(30, (2 ** attempt) * self.retry_backoff_factor)
-                    info(f"HTTP错误，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(30, (2 ** attempt) * self.retry_backoff_factor)
+                    random_wait = random.uniform(0.5, 2)
+                    total_wait = base_wait + random_wait
+                    info(f"HTTP错误，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except requests.exceptions.RequestException as e:
                 error(f"AKShare请求异常 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(30, (2 ** attempt) * self.retry_backoff_factor)
-                    info(f"请求异常，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(30, (2 ** attempt) * self.retry_backoff_factor)
+                    random_wait = random.uniform(0.5, 2)
+                    total_wait = base_wait + random_wait
+                    info(f"请求异常，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except ConnectionResetError as e:
                 error(f"AKShare连接重置错误 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(60, (2 ** attempt) * self.retry_backoff_factor * 2)  # 连接重置等待时间翻倍
-                    info(f"连接重置，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(60, (2 ** attempt) * self.retry_backoff_factor * 3)
+                    random_wait = random.uniform(2, 8)
+                    total_wait = base_wait + random_wait
+                    info(f"连接重置，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except ValueError as e:
                 # 处理JSON解析错误或数据格式错误
                 error(f"AKShare数据解析错误 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(30, (2 ** attempt) * self.retry_backoff_factor)
-                    info(f"数据解析错误，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(30, (2 ** attempt) * self.retry_backoff_factor)
+                    random_wait = random.uniform(0.5, 2)
+                    total_wait = base_wait + random_wait
+                    info(f"数据解析错误，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
             except Exception as e:
                 error(f"AKShare未知异常 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
-                    wait_time = min(30, (2 ** attempt) * self.retry_backoff_factor)
-                    info(f"未知异常，等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
+                    base_wait = min(30, (2 ** attempt) * self.retry_backoff_factor)
+                    random_wait = random.uniform(0.5, 2)
+                    total_wait = base_wait + random_wait
+                    info(f"未知异常，等待 {total_wait:.2f} 秒后重试...")
+                    time.sleep(total_wait)
                     
         error(f"AKShare API调用失败，已重试 {self.max_retries} 次")
         return None
@@ -365,14 +410,12 @@ class AKShareSource:
                     else:
                         warning(f"网络请求失败 - URL: {url}, 状态码: {response.status_code}")
                 except requests.exceptions.Timeout:
-                    warning(f"网络请求超时 - URL: {url}")
+                    error(f"网络请求超时 - URL: {url}")
                 except requests.exceptions.ConnectionError:
                     warning(f"网络连接错误 - URL: {url}")
                 except Exception as e:
                     warning(f"网络连接检查失败 - URL: {url}, 错误: {str(e)}")
-                except Exception as e:
-                    warning(f"网络检查异常 - URL: {url}, 错误: {str(e)}")
-            
+
             warning("所有网络检查都失败")
             return False
             
@@ -433,43 +476,6 @@ class AKShareSource:
         except Exception as e:
             warning(f"AKShare服务检查异常: {str(e)}")
             return False
-
-    def _get_fallback_data(self, stock_code: str, data_type: str) -> Any:
-        """
-        获取备用数据（当AKShare服务不可用时）
-        
-        Args:
-            stock_code: 股票代码
-            data_type: 数据类型
-            
-        Returns:
-            备用数据
-        """
-        debug(f"尝试获取 {stock_code} 的备用数据类型: {data_type}")
-        
-        if data_type == "price":
-            # 返回一个空的价格数据结构
-            return pd.DataFrame(columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额'])
-        elif data_type == "realtime":
-            # 返回空的实时数据结构
-            return pd.DataFrame(columns=['代码', '名称', '最新价', '涨跌幅', '涨跌额', '成交量', '成交额'])
-        elif data_type == "info":
-            # 返回基本的股票信息
-            pure_code = self._get_pure_stock_code(self._normalize_stock_code(stock_code))
-            return {
-                '代码': pure_code,
-                '名称': f'股票{pure_code}',
-                '市场': '深A' if stock_code.startswith(('sz', 'SZ', '300', '000', '001', '002')) else '沪A',
-                '数据来源': '备用数据'
-            }
-        elif data_type == "news":
-            # 返回空新闻列表
-            return []
-        elif data_type == "financial":
-            # 返回空的财务数据结构
-            return {}
-        
-        return None
 
     def _get_cached_data(self, cache_key: str, ttl_seconds: Optional[int] = None) -> Optional[Any]:
         """
@@ -785,7 +791,7 @@ class AKShareSource:
         except Exception as e:
             warning(f"记录服务检查日志时出错: {str(e)}")
 
-    def _get_fallback_data(self, data_type: str, symbol: str) -> Optional[pd.DataFrame]:
+    def _get_fallback_data(self, data_type: str, symbol: str) -> None | DataFrame | dict[str, str] | dict[str, str | int | float]:
         """
         获取备用数据
         
@@ -944,12 +950,12 @@ class AKShareSource:
         # 检查网络连接
         if not self._check_connection():
             error("网络连接检查失败，无法获取股票价格数据")
-            return self._get_fallback_data(stock_code, "price")
+            return self._get_fallback_data("price", stock_code)
 
         # 检查AKShare服务可用性
         if not self._check_akshare_service():
             error("AKShare服务不可用，无法获取股票价格数据")
-            return self._get_fallback_data(stock_code, "price")
+            return self._get_fallback_data("price", stock_code)
 
         try:
             info(f"获取股票价格数据: {normalized_code}, 周期: {period}, 间隔: {interval}")
@@ -1022,12 +1028,12 @@ class AKShareSource:
                 return data
             else:
                 error(f"AKShare返回空数据: {normalized_code}")
-                return self._get_fallback_data(stock_code, "price")
+                return self._get_fallback_data("price", stock_code)
                 
         except Exception as e:
             error(f"获取股票价格数据失败: {normalized_code}, 错误: {str(e)}")
             print_log_exception()
-            return self._get_fallback_data(stock_code, "price")
+            return self._get_fallback_data("price", stock_code)
 
     def get_stock_realtime_data(self, stock_code: str) -> dict[str, str | Any] | None:
         """
@@ -1059,12 +1065,12 @@ class AKShareSource:
             # 检查网络连接
             if not self._check_connection():
                 error("网络连接检查失败，无法获取股票实时数据")
-                return self._get_fallback_data(stock_code, "realtime")
+                return self._get_fallback_data("realtime", stock_code)
 
             # 检查AKShare服务可用性
             if not self._check_akshare_service():
                 error("AKShare服务不可用，无法获取股票实时数据")
-                return self._get_fallback_data(stock_code, "realtime")
+                return self._get_fallback_data("realtime", stock_code)
 
             self._wait_for_rate_limit()
 
@@ -1076,7 +1082,7 @@ class AKShareSource:
 
             if result is None or result.empty:
                 warning(f"未获取到实时数据: {normalized_code}，返回备用数据")
-                return self._get_fallback_data(stock_code, "realtime")
+                return self._get_fallback_data("realtime", stock_code)
 
             # 尝试多种匹配方式查找对应股票的数据
             stock_data = None
@@ -1103,7 +1109,7 @@ class AKShareSource:
 
             if stock_data is None or stock_data.empty:
                 warning(f"未找到股票 {normalized_code} 的实时数据，返回备用数据")
-                return self._get_fallback_data(stock_code, "realtime")
+                return self._get_fallback_data("realtime", stock_code)
 
             # 提取实时数据
             row = stock_data.iloc[0]
@@ -1138,7 +1144,7 @@ class AKShareSource:
             error(f"从AKShare获取 {normalized_code} 实时数据时出错: {str(e)}")
             print_log_exception()
             # 返回备用数据
-            return self._get_fallback_data(stock_code, "realtime")
+            return self._get_fallback_data("realtime", stock_code)
 
     def get_stock_info(self, stock_code: str) -> dict[str, str | Any] | None:
         """
@@ -1168,12 +1174,12 @@ class AKShareSource:
             # 检查网络连接
             if not self._check_connection():
                 warning(f"网络连接不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "info")
+                return self._get_fallback_data("info", stock_code)
 
             # 检查AKShare服务可用性
             if not self._check_akshare_service():
                 warning(f"AKShare服务不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "info")
+                return self._get_fallback_data("info", stock_code)
 
             self._wait_for_rate_limit()
 
@@ -1192,10 +1198,10 @@ class AKShareSource:
             try:
                 # 方法1: 使用stock_individual_info_em
                 def fetch_info_em():
-                    return ak.stock_individual_info_em(symbol=pure_code)
+                    return ak.stock_individual_info_em(symbol=pure_code, timeout=10)
                 
                 result = self._retry_api_call(fetch_info_em)
-                
+
                 # 方法2: 如果方法1失败，尝试stock_individual_basic_info_xq作为备选
                 if result is None:
                     def fetch_basic_info():
@@ -1238,7 +1244,7 @@ class AKShareSource:
                         stock_info['full_name'] = result.get('公司名称', stock_info['full_name'])
                         
                         # 尝试从data键中获取信息
-                        if 'data' in result:
+                        if 'data' in result and result['data'] is not None:
                             data = result['data']
                             if isinstance(data, dict):
                                 stock_info['name'] = data.get('股票名称', stock_info['name'])
@@ -1271,7 +1277,7 @@ class AKShareSource:
                     # 继续执行，使用已有默认值
             else:
                 warning(f"AKShare返回None，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "info")
+                return self._get_fallback_data("info", stock_code)
 
             # 获取最新行情信息以补充
             try:
@@ -1313,7 +1319,7 @@ class AKShareSource:
             error(f"从AKShare获取 {normalized_code} 基本信息时出错: {str(e)}")
             print_log_exception()
             # 返回备用数据
-            return self._get_fallback_data(stock_code, "info")
+            return self._get_fallback_data("info", stock_code)
 
     def get_stock_news(self, stock_code: str, limit: int = 5) -> list[dict[str, str | Any] | dict[str, str | Any]] | None:
         """
@@ -1343,12 +1349,12 @@ class AKShareSource:
             # 检查网络连接
             if not self._check_connection():
                 warning(f"网络连接不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "news")
+                return self._get_fallback_data("news", stock_code)
 
             # 检查AKShare服务可用性
             if not self._check_akshare_service():
                 warning(f"AKShare服务不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "news")
+                return self._get_fallback_data("news", stock_code)
 
             self._wait_for_rate_limit()
 
@@ -1398,7 +1404,7 @@ class AKShareSource:
 
             if not news_list:
                 warning(f"从AKShare获取 {normalized_code} 新闻数据为空，返回备用数据")
-                return self._get_fallback_data(stock_code, "news")
+                return self._get_fallback_data("news", stock_code)
 
             info(f"成功从AKShare获取 {normalized_code} 相关新闻，返回 {len(news_list)} 条")
 
@@ -1411,7 +1417,7 @@ class AKShareSource:
             error(f"从AKShare获取 {normalized_code} 新闻时出错: {str(e)}")
             print_log_exception()
             # 返回备用数据
-            return self._get_fallback_data(stock_code, "news")
+            return self._get_fallback_data("news", stock_code)
 
     def get_financial_data(self, stock_code: str) -> dict[str, DataFrame] | None:
         """
@@ -1441,12 +1447,12 @@ class AKShareSource:
             # 检查网络连接
             if not self._check_connection():
                 warning(f"网络连接不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "financial")
+                return self._get_fallback_data("financial", stock_code)
 
             # 检查AKShare服务可用性
             if not self._check_akshare_service():
                 warning(f"AKShare服务不可用，返回 {normalized_code} 备用数据")
-                return self._get_fallback_data(stock_code, "financial")
+                return self._get_fallback_data("financial", stock_code)
 
             self._wait_for_rate_limit()
 
@@ -1520,7 +1526,7 @@ class AKShareSource:
 
             if not valid_financial_data:
                 warning(f"从AKShare获取 {normalized_code} 财务数据失败，所有报表均为空或格式无效，返回备用数据")
-                return self._get_fallback_data(stock_code, "financial")
+                return self._get_fallback_data("financial", stock_code)
 
             info(f"成功从AKShare获取 {normalized_code} 财务数据，包含 {len(valid_financial_data)} 种报表")
 
@@ -1533,4 +1539,4 @@ class AKShareSource:
             error(f"从AKShare获取 {normalized_code} 财务数据时出错: {str(e)}")
             print_log_exception()
             # 返回备用数据
-            return self._get_fallback_data(stock_code, "financial")
+            return self._get_fallback_data("financial", stock_code)
